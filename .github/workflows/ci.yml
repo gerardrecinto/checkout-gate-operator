@@ -79,7 +79,11 @@ jobs:
       - name: govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version-input: "1.23"
+          # The scanner tool itself needs a newer Go toolchain than the
+          # project's own go.mod (1.23) declares, this only picks the Go
+          # version govulncheck runs under, it does not change what this
+          # module targets.
+          go-version-input: "1.26"
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
