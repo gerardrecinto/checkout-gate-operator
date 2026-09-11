@@ -16,6 +16,11 @@ instead of a bullet list, idiomatic Go extending Kubernetes through a
 real controller, a production-shaped Web UI integrated with a Go
 backend, and security-first containerization end to end.
 
+<p align="center">
+  <img src="docs/assets/checkout-gate-dashboard-demo.gif" alt="Real recording of the Svelte dashboard polling the Go status API, verdict badges cycling through Pass, Warn, and Breach as a CheckoutGate's status updates" width="760" />
+</p>
+<p align="center"><sub>Real recording: the actual <code>frontend/</code> app polling the actual <code>internal/apiserver</code> package. The status data is pushed by a local script cycling a few sample gates, not a live cluster reconciling, see "What's verified, and what isn't" below for why.</sub></p>
+
 ## What's actually here
 
 ### Go & Kubernetes
