@@ -11,7 +11,7 @@ RUN npm run build
 # Stage 2: build the Go manager binary. CGO disabled and a static build so
 # the runtime stage needs nothing beyond the binary itself, no libc
 # dependency to drag into a distroless image.
-FROM golang:1.23 AS go-builder
+FROM golang:1.25 AS go-builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
