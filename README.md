@@ -1,5 +1,12 @@
 # checkout-gate-operator
 
+![CI](https://github.com/gerardrecinto/checkout-gate-operator/actions/workflows/ci.yml/badge.svg?branch=main)
+![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-controller--runtime-326CE5?logo=kubernetes&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte-TypeScript-FF3E00?logo=svelte&logoColor=white)
+![Cosign](https://img.shields.io/badge/Signed-Cosign%20keyless-4A4A4A)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
 A real Kubernetes operator for retail checkout services: a `CheckoutGate`
 custom resource, a controller that reconciles it against a target
 Deployment's live error rate, p99 latency, and CPU saturation, a
@@ -149,4 +156,23 @@ docker build -t checkout-gate-operator:local .
 Running the manager itself against a real cluster needs a kubeconfig
 pointing at one, the CRD installed (`kubectl apply -f config/crd/`),
 cert-manager installed for the webhook's TLS, and the RBAC/Deployment
-manifests applied (`kubectl apply -k config/`).
+manifests applied (`kubectl apply -k config/`). Full walkthrough in
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), how the reconciler,
+  webhook, and status API fit together inside one manager process.
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), every command in
+  this README, plus the deploy-to-a-real-cluster steps.
+- [docs/technologies/](docs/technologies/), a deep dive into each real
+  piece of this stack, `controller-runtime`, CRDs and code generation,
+  admission webhooks, cert-manager/TLS, RBAC, Cosign/Sigstore,
+  Trivy/govulncheck, distroless containers, Prometheus/PromQL, Svelte,
+  Kustomize, each grounded in this repo's actual code, not a generic
+  tutorial.
+- [SECURITY.md](SECURITY.md), what's scanned, how the image is signed,
+  and how to verify it yourself.
+- [CONTRIBUTING.md](CONTRIBUTING.md), the checks to run before opening
+  a PR.
+- [CHANGELOG.md](CHANGELOG.md).
