@@ -1,0 +1,121 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
+  name: checkoutgates.checkout.gerardrecinto.dev
+spec:
+  group: checkout.gerardrecinto.dev
+  names:
+    kind: CheckoutGate
+    listKind: CheckoutGateList
+    plural: checkoutgates
+    singular: checkoutgate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.targetDeployment
+      name: Target
+      type: string
+    - jsonPath: .status.verdict
+      name: Verdict
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CheckoutGate is the Schema for the checkoutgates API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              CheckoutGateSpec declares the SLO thresholds a target Deployment must
+              stay under. Same five-signal shape as a plain CLI evaluator would use,
+              expressed here as a real Kubernetes resource instead: error rate, p99
+              latency, and resource saturation, checked by a controller that reconciles
+              continuously instead of running once and exiting.
+            properties:
+              maxCpuSaturationPercent:
+                description: MaxCpuSaturationPercent is the highest acceptable average
+                  CPU saturation across the target's pods before the gate reports
+                  Warn.
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
+              maxErrorRateMilliPercent:
+                description: |-
+                  MaxErrorRateMilliPercent is the highest acceptable HTTP 5xx rate before the gate reports Breach,
+                  expressed in thousandths of a percent (500 = 0.5%) so a sub-1% threshold stays an exact integer
+                  instead of a float in a CRD schema, the same reason Kubernetes represents CPU in millicores.
+                format: int32
+                maximum: 100000
+                minimum: 0
+                type: integer
+              maxP99LatencyMs:
+                description: MaxP99LatencyMs is the highest acceptable p99 latency
+                  in milliseconds before the gate reports Breach.
+                format: int32
+                minimum: 0
+                type: integer
+              targetDeployment:
+                description: TargetDeployment is the name of the Deployment this gate
+                  watches, in the same namespace as the CheckoutGate.
+                minLength: 1
+                type: string
+            required:
+            - maxCpuSaturationPercent
+            - maxErrorRateMilliPercent
+            - maxP99LatencyMs
+            - targetDeployment
+            type: object
+          status:
+            description: CheckoutGateStatus is written by the controller on every
+              reconcile, never by a user.
+            properties:
+              lastEvaluated:
+                description: LastEvaluated is when this Status was last written.
+                format: date-time
+                type: string
+              message:
+                description: Message is a short, human-readable explanation of the
+                  verdict.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration lets a client tell whether Status
+                  reflects the most recent Spec edit.
+                format: int64
+                type: integer
+              readyReplicas:
+                description: ReadyReplicas mirrors the target Deployment's ready replica
+                  count at evaluation time.
+                format: int32
+                type: integer
+              verdict:
+                description: Verdict is the outcome of the most recent evaluation.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

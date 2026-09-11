@@ -1,0 +1,10 @@
+apiVersion: checkout.gerardrecinto.dev/v1alpha1
+kind: CheckoutGate
+metadata:
+  name: retail-checkout-gate
+  namespace: default
+spec:
+  targetDeployment: retail-checkout-api
+  maxErrorRateMilliPercent: 500 # 0.5%
+  maxP99LatencyMs: 450
+  maxCpuSaturationPercent: 80

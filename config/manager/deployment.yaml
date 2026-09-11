@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: checkout-gate-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-gate-operator
+  namespace: checkout-gate-system
+  labels:
+    app: checkout-gate-operator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout-gate-operator
+  template:
+    metadata:
+      labels:
+        app: checkout-gate-operator
+    spec:
+      serviceAccountName: checkout-gate-operator
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          image: ghcr.io/gerardrecinto/checkout-gate-operator:latest
+          args:
+            - --leader-elect
+            - --prometheus-address=http://prometheus-k8s.monitoring.svc:9090
+          ports:
+            - name: webhook
+              containerPort: 9443
+            - name: metrics
+              containerPort: 8443
+            - name: api
+              containerPort: 8081
+            - name: health
+              containerPort: 8082
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: checkout-gate-webhook-server-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-gate-operator-api
+  namespace: checkout-gate-system
+spec:
+  selector:
+    app: checkout-gate-operator
+  ports:
+    - port: 8081
+      targetPort: 8081

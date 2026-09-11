@@ -1,0 +1,62 @@
+# Real TLS for the admission webhook, cert-manager issues and auto-rotates
+# a serving certificate for the webhook Service, mounted into the manager
+# Pod at the --webhook-cert-dir path (see config/manager/deployment.yaml).
+# The apiserver calling this webhook validates the cert against the CA
+# bundle cert-manager injects into the ValidatingWebhookConfiguration via
+# the cert-manager.io/inject-ca-from annotation below, no manually
+# generated or manually rotated certs anywhere in this flow.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: checkout-gate-selfsigned-issuer
+  namespace: checkout-gate-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: checkout-gate-webhook-cert
+  namespace: checkout-gate-system
+spec:
+  dnsNames:
+    - checkout-gate-operator-webhook-service.checkout-gate-system.svc
+    - checkout-gate-operator-webhook-service.checkout-gate-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: checkout-gate-selfsigned-issuer
+  secretName: checkout-gate-webhook-server-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-gate-operator-webhook-service
+  namespace: checkout-gate-system
+spec:
+  selector:
+    app: checkout-gate-operator
+  ports:
+    - port: 443
+      targetPort: 9443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: checkout-gate-operator-validating-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: checkout-gate-system/checkout-gate-webhook-cert
+webhooks:
+  - name: vcheckoutgate.gerardrecinto.dev
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: checkout-gate-operator-webhook-service
+        namespace: checkout-gate-system
+        path: /validate-checkout-gerardrecinto-dev-v1alpha1-checkoutgate
+    rules:
+      - apiGroups: ["checkout.gerardrecinto.dev"]
+        apiVersions: ["v1alpha1"]
+        resources: ["checkoutgates"]
+        operations: ["CREATE", "UPDATE"]
