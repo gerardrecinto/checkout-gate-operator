@@ -26,6 +26,16 @@ type GateSummary struct {
 	LastEvaluated    string `json:"lastEvaluated,omitempty"`
 }
 
+// VerdictCounts tallies gates by verdict, for a dashboard header stat that
+// shouldn't have to fetch and count the full gate list itself.
+type VerdictCounts struct {
+	Total   int `json:"total"`
+	Pass    int `json:"pass"`
+	Warn    int `json:"warn"`
+	Breach  int `json:"breach"`
+	Unknown int `json:"unknown"`
+}
+
 // Server implements manager.Runnable and manager.LeaderElectionRunnable:
 // it only needs to run on the leader replica, same as the controller
 // itself, two Runnables sharing one leader election decision instead of
@@ -43,6 +53,7 @@ func (s *Server) NeedLeaderElection() bool { return true }
 func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/gates", s.handleListGates)
+	mux.HandleFunc("/api/gates/summary", s.handleSummary)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	srv := &http.Server{Addr: s.Addr, Handler: withCORS(mux)}
@@ -86,6 +97,34 @@ func (s *Server) handleListGates(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(summaries); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
+	var list checkoutv1alpha1.CheckoutGateList
+	if err := s.Reader.List(r.Context(), &list); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var counts VerdictCounts
+	for _, cg := range list.Items {
+		counts.Total++
+		switch cg.Status.Verdict {
+		case checkoutv1alpha1.VerdictPass:
+			counts.Pass++
+		case checkoutv1alpha1.VerdictWarn:
+			counts.Warn++
+		case checkoutv1alpha1.VerdictBreach:
+			counts.Breach++
+		default:
+			counts.Unknown++
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(counts); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
