@@ -1,7 +1,7 @@
 # Stage 1: build the frontend. Kept in its own stage so the final image
 # never sees node, npm, or the frontend's dependency tree, only the
 # static files vite already compiled.
-FROM node:20-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install --no-audit --no-fund
