@@ -77,9 +77,9 @@ with 6 passing `pytest` tests in `scripts/test_verify_gate.py` mocking
 only the Kubernetes API boundary. Java depth lives in a sibling repo,
 not duplicated here: `joltrin/bindings/java/examples/spring-boot-checkout-store`,
 a real Spring Boot service, same retail-checkout theme, verified end to
-end against a real embedded store (open PR:
-[SharedCode/joltrin#311](https://github.com/SharedCode/joltrin/pull/311),
-not yet merged to `master`).
+end against a real embedded store
+([SharedCode/joltrin#311](https://github.com/SharedCode/joltrin/pull/311),
+merged to `master` on 2026-09-16).
 
 ### Security & Encryption
 
