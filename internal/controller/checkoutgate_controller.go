@@ -16,6 +16,7 @@ import (
 
 	checkoutv1alpha1 "github.com/gerardrecinto/checkout-gate-operator/api/v1alpha1"
 	"github.com/gerardrecinto/checkout-gate-operator/internal/gate"
+	"github.com/gerardrecinto/checkout-gate-operator/internal/notify"
 )
 
 // MetricsProvider is the seam between the controller and wherever real
@@ -30,6 +31,10 @@ type MetricsProvider interface {
 type CheckoutGateReconciler struct {
 	client.Client
 	Metrics MetricsProvider
+	// Notifier is called once per real verdict change, never on every
+	// reconcile. A nil Notifier is treated the same as notify.NoopNotifier{},
+	// so existing callers that don't set this field keep working unchanged.
+	Notifier notify.Notifier
 }
 
 // +kubebuilder:rbac:groups=checkout.gerardrecinto.dev,resources=checkoutgates,verbs=get;list;watch;update;patch
@@ -47,6 +52,12 @@ func (r *CheckoutGateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("fetching CheckoutGate: %w", err)
 	}
 
+	// Captured before anything below overwrites Status.Verdict, so the
+	// notifier can tell a real transition (Pass->Warn, Warn->Breach, ...)
+	// apart from a reconcile that just re-confirms where the gate already
+	// was.
+	previousVerdict := cg.Status.Verdict
+
 	var dep appsv1.Deployment
 	depKey := types.NamespacedName{Namespace: cg.Namespace, Name: cg.Spec.TargetDeployment}
 	if err := r.Get(ctx, depKey, &dep); err != nil {
@@ -58,6 +69,7 @@ func (r *CheckoutGateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if updErr := r.Status().Update(ctx, &cg); updErr != nil {
 				return ctrl.Result{}, updErr
 			}
+			r.notifyVerdictChange(ctx, &cg, previousVerdict)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("fetching target Deployment: %w", err)
@@ -86,7 +98,40 @@ func (r *CheckoutGateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	logger.Info("reconciled CheckoutGate", "name", cg.Name, "verdict", result.Verdict, "message", result.Message)
 
+	r.notifyVerdictChange(ctx, &cg, previousVerdict)
+
 	return ctrl.Result{}, nil
+}
+
+// notifyVerdictChange calls the Notifier when, and only when, cg.Status.Verdict
+// actually differs from previousVerdict. Two cases are deliberately not a
+// transition: a nil/empty previousVerdict (this CheckoutGate has never been
+// evaluated before, so there's nothing to transition from, an initial
+// verdict isn't a change), and a reconcile that re-confirms the verdict it
+// already had. Same instinct as gate.Evaluate() choosing Warn over Breach
+// on a CPU signal alone: react to a real change, not to noise.
+func (r *CheckoutGateReconciler) notifyVerdictChange(ctx context.Context, cg *checkoutv1alpha1.CheckoutGate, previousVerdict checkoutv1alpha1.GateVerdict) {
+	if r.Notifier == nil {
+		return
+	}
+	if previousVerdict == "" || previousVerdict == cg.Status.Verdict {
+		return
+	}
+
+	logger := log.FromContext(ctx)
+	transition := notify.VerdictTransition{
+		Namespace:        cg.Namespace,
+		Name:             cg.Name,
+		TargetDeployment: cg.Spec.TargetDeployment,
+		OldVerdict:       string(previousVerdict),
+		NewVerdict:       string(cg.Status.Verdict),
+		Message:          cg.Status.Message,
+		Timestamp:        cg.Status.LastEvaluated.Time,
+	}
+	if err := r.Notifier.NotifyVerdictTransition(ctx, transition); err != nil {
+		logger.Error(err, "publishing verdict transition", "name", cg.Name, "namespace", cg.Namespace,
+			"old", previousVerdict, "new", cg.Status.Verdict)
+	}
 }
 
 // mapDeploymentToGates finds every CheckoutGate in the changed Deployment's

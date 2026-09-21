@@ -66,10 +66,15 @@ never a manually generated or manually rotated cert sitting in a repo.
 ### Software Development & Testing
 
 This project demonstrates those skills.
-Go: 19 real tests across four packages, `go test ./... -race` clean,
+Go: 29 real tests across five packages, `go test ./... -race` clean,
 the pure gate-evaluation logic (`internal/gate`) at 100% coverage, the
 reconciler tested against a real `controller-runtime` fake client (no
 live cluster, but the real client machinery, not a hand-rolled stub).
+The optional NATS notifier (`internal/notify`) follows the same
+`MetricsProvider` seam pattern: a `Notifier` interface, a no-op default,
+and a real implementation the reconciler only calls when a verdict
+actually transitions, tested against a fake with no live NATS server
+required.
 Python: `scripts/verify_gate.py` is a real post-deploy smoke-test
 pattern, apply a `CheckoutGate`, poll its status until the controller
 reconciles it, fail the pipeline if the verdict isn't what was expected,

@@ -21,6 +21,7 @@ import (
 	checkoutv1alpha1 "github.com/gerardrecinto/checkout-gate-operator/api/v1alpha1"
 	"github.com/gerardrecinto/checkout-gate-operator/internal/apiserver"
 	"github.com/gerardrecinto/checkout-gate-operator/internal/controller"
+	"github.com/gerardrecinto/checkout-gate-operator/internal/notify"
 	internalwebhook "github.com/gerardrecinto/checkout-gate-operator/internal/webhook"
 )
 
@@ -32,13 +33,14 @@ func init() {
 }
 
 func main() {
-	var metricsAddr, apiAddr, prometheusAddr, webhookCertDir string
+	var metricsAddr, apiAddr, prometheusAddr, webhookCertDir, natsURL string
 	var enableLeaderElection bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8443", "Address the metrics endpoint binds to.")
 	flag.StringVar(&apiAddr, "api-bind-address", ":8081", "Address the status API for the frontend binds to.")
 	flag.StringVar(&prometheusAddr, "prometheus-address", "http://prometheus-k8s.monitoring.svc:9090", "Prometheus base URL used to evaluate gates.")
 	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "/tmp/k8s-webhook-server/serving-certs", "Directory holding the webhook's TLS cert/key, provisioned by cert-manager in production, see config/webhook.")
+	flag.StringVar(&natsURL, "nats-url", "", "NATS server URL to publish CheckoutGate verdict transitions to (e.g. nats://nats.messaging.svc:4222). Empty disables notifications entirely and uses a no-op notifier.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election, so only one replica reconciles at a time.")
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -65,9 +67,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	var verdictNotifier notify.Notifier = notify.NoopNotifier{}
+	if natsURL != "" {
+		natsNotifier, err := notify.NewNATSNotifier(natsURL)
+		if err != nil {
+			ctrl.Log.Error(err, "unable to connect to NATS")
+			os.Exit(1)
+		}
+		defer natsNotifier.Close()
+		verdictNotifier = natsNotifier
+	}
+
 	if err := (&controller.CheckoutGateReconciler{
-		Client:  mgr.GetClient(),
-		Metrics: promMetrics,
+		Client:   mgr.GetClient(),
+		Metrics:  promMetrics,
+		Notifier: verdictNotifier,
 	}).SetupWithManager(mgr); err != nil {
 		ctrl.Log.Error(err, "unable to set up CheckoutGate controller")
 		os.Exit(1)
