@@ -36,6 +36,8 @@ from. All three share one Kubernetes client and one informer cache.**
                     |  3. fetch live metrics (Prometheus)|
                     |  4. gate.Evaluate() -- pure logic |
                     |  5. write Status.Verdict           |
+                    |  6. notify on verdict change only  |
+                    |     (NATS, optional, see below)    |
                     +---------------+----------------+
                                     |
                     Status write also lands in the shared cache
@@ -87,6 +89,11 @@ internal/controller/ The reconciler (orchestration: fetch, evaluate,
                       write) and the real Prometheus-backed
                       MetricsProvider implementation.
 
+internal/notify/     The Notifier seam: a no-op by default, a real
+                      NATS publisher when -nats-url is set. Called by
+                      the reconciler only when a verdict actually
+                      changes, see technologies/nats-notifications.md.
+
 internal/webhook/    The validating admission webhook. Depends on
                       client.Reader only, not the full reconciler.
 
@@ -109,4 +116,4 @@ own `_test.go` file for exactly how.
 - [technologies/](technologies/) for a deep dive into each specific
   technology used here (`controller-runtime`, CRDs, webhooks,
   cert-manager, RBAC, Cosign, Trivy/govulncheck, distroless containers,
-  Prometheus/PromQL, Svelte, Kustomize).
+  Prometheus/PromQL, Svelte, Kustomize, NATS notifications).
