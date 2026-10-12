@@ -1,0 +1,25 @@
+# One Ubuntu VM that is provisioned by provision.sh. The libvirt provider uses
+# KVM, so it needs a Linux host with /dev/kvm. The CI job runs it on a runner.
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/ubuntu2204"
+  config.vm.hostname = "edge-lab"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider :libvirt do |lv|
+    lv.driver = "kvm"
+    lv.cpus = 2
+    lv.memory = 2048
+  end
+
+  # On some hosts the libvirt NAT forwards DNS to a loopback stub resolver the
+  # guest cannot reach. Set VM_DNS (for example 1.1.1.1) to give the guest one.
+  if ENV["VM_DNS"]
+    config.vm.provision "shell", inline: <<-SH
+      mkdir -p /etc/systemd/resolved.conf.d
+      printf '[Resolve]\nDNS=#{ENV["VM_DNS"]}\n' > /etc/systemd/resolved.conf.d/lab.conf
+      systemctl restart systemd-resolved
+    SH
+  end
+
+  config.vm.provision "shell", path: "provision.sh"
+end
