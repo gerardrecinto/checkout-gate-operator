@@ -4,8 +4,11 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update -qq
-apt-get install -y -qq nginx openssl curl
+# Without strict update errors apt can reuse stale indexes after a DNS failure,
+# then loop while trying to download packages that it cannot reach.
+apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update -qq
+apt-get "${apt_options[@]}" install -y -qq nginx openssl curl
 
 install -d -m 0750 /etc/nginx/tls
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
@@ -36,7 +39,7 @@ systemctl reload nginx
 
 # Checks
 [ "$(curl -ks https://localhost/healthz)" = ok ] || { echo "FAIL healthz"; exit 1; }
-curl -ksI https://localhost/healthz | grep -qi '^server: nginx$' || { echo "FAIL server header leaks version"; exit 1; }
+curl -ksI https://localhost/healthz | tr -d '\r' | grep -qi '^server: nginx$' || { echo "FAIL server header leaks version"; exit 1; }
 ps -o user= -C nginx | sort -u | tr '\n' ' ' | grep -q www-data || { echo "FAIL no nginx worker as www-data"; exit 1; }
 [ "$(sysctl -n net.ipv4.tcp_syncookies)" = 1 ] || { echo "FAIL syncookies"; exit 1; }
 echo "provision checks passed on $(uname -r), kvm guest: $(systemd-detect-virt)"

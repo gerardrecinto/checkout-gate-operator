@@ -32,6 +32,7 @@ jobs:
           vagrant --version
 
       - name: Bring the VM up and provision it
+        timeout-minutes: 15
         working-directory: deploy/vagrant
         env:
           VM_DNS: 1.1.1.1
@@ -43,4 +44,18 @@ jobs:
         working-directory: deploy/vagrant
         run: |
           grep 'provision checks passed' up.log
+
+      - name: Diagnose guest networking on failure
+        if: failure()
+        timeout-minutes: 2
+        working-directory: deploy/vagrant
+        run: |
+          sudo virsh net-list --all
+          sudo vagrant ssh -c 'ip -brief address; ip route; cat /etc/resolv.conf; resolvectl status; getent ahostsv4 mirrors.edge.kernel.org'
+
+      - name: Destroy the VM
+        if: always()
+        timeout-minutes: 3
+        working-directory: deploy/vagrant
+        run: |
           sudo vagrant destroy -f
