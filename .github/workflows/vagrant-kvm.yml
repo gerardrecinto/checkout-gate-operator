@@ -51,7 +51,16 @@ jobs:
         working-directory: deploy/vagrant
         run: |
           sudo virsh net-list --all
-          sudo vagrant ssh -c 'ip -brief address; ip route; cat /etc/resolv.conf; resolvectl status; getent ahostsv4 mirrors.edge.kernel.org'
+          sudo vagrant ssh -c '
+            ip -brief address
+            ip route
+            cat /etc/resolv.conf
+            resolvectl status
+            echo "Testing TCP connectivity to CI DNS at 1.1.1.1:53"
+            timeout 5 bash -c "true > /dev/tcp/1.1.1.1/53"
+            resolvectl query mirrors.edge.kernel.org
+            journalctl -u systemd-resolved --no-pager -n 40
+          '
 
       - name: Destroy the VM
         if: always()

@@ -55,3 +55,33 @@ def test_server_header_check_accepts_http_line_endings(tmp_path, header, expecte
     result = subprocess.run(["bash", "-c", check], env=env,
                             capture_output=True, text=True, timeout=5)
     assert result.returncode == expected_status, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("dns, route, resolver_status, expected_status, expected_calls", [
+    ("1.1.1.1", "default via 192.168.121.1 dev eth0 proto dhcp", 0, 0,
+     ["dns eth0 1.1.1.1", "domain eth0 ~.", "flush-caches", "status eth0"]),
+    ("", "default via 192.168.121.1 dev eth0", 0, 1, []),
+    ("1.1.1.1", "", 0, 1, []),
+    ("invalid-server", "default via 192.168.121.1 dev eth0", 2, 2,
+     ["dns eth0 invalid-server"]),
+])
+def test_dns_override_targets_default_route_link(
+        tmp_path, dns, route, resolver_status, expected_status, expected_calls):
+    ip = tmp_path / "ip"
+    ip.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$DEFAULT_ROUTE"\n')
+    resolver = tmp_path / "resolvectl"
+    resolver.write_text('''#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$RESOLVER_CALLS"
+if [[ "$1" = dns ]]; then exit "$RESOLVER_STATUS"; fi
+''')
+    ip.chmod(0o755)
+    resolver.chmod(0o755)
+    calls = tmp_path / "resolver-calls"
+    env = dict(os.environ, PATH=f"{tmp_path}:{os.environ['PATH']}", VM_DNS=dns,
+               DEFAULT_ROUTE=route, RESOLVER_STATUS=str(resolver_status),
+               RESOLVER_CALLS=str(calls))
+    script = PROVISION.with_name("configure-dns.sh")
+    result = subprocess.run(["bash", str(script)], env=env,
+                            capture_output=True, text=True, timeout=5)
+    assert result.returncode == expected_status, result.stderr
+    assert (calls.read_text().splitlines() if calls.exists() else []) == expected_calls

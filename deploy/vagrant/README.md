@@ -18,12 +18,16 @@ a header that includes the NGINX version.
 The GitHub Actions job limits VM startup and provisioning to 15 minutes,
 prints guest addresses, routes, resolver configuration, and a repository DNS
 lookup on failure, and attempts VM cleanup after success or failure.
-`VM_DNS` optionally sets a global systemd-resolved DNS server; it does not
-guarantee that guest DNS or outbound NAT connectivity works.
+`VM_DNS` optionally sets a single DNS server IP address on the guest's
+default-route interface and routes all DNS queries through that link. The
+resolver rejects invalid addresses, and provisioning stops if the interface
+is missing or DNS configuration fails. DNSSEC settings are preserved.
 
-The previous CI run failed to resolve the Ubuntu package mirror inside the
-guest. The underlying networking cause remains unverified; these changes
-make the error fail promptly and collect evidence for the next KVM run.
+The first diagnostic CI run failed promptly and cleaned up the VM. It showed
+that the old global DNS drop-in left inherited global and per-link servers
+active, including a different current DNS server from `VM_DNS`. The explicit
+per-link override corrects that configuration; successful DNS resolution and
+outbound NAT connectivity still need verification in the next Linux run.
 macOS cannot run this KVM check. The package failure regression tests run
 without a VM:
 
