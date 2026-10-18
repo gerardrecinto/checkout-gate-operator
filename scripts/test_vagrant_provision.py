@@ -85,3 +85,32 @@ if [[ "$1" = dns ]]; then exit "$RESOLVER_STATUS"; fi
                             capture_output=True, text=True, timeout=5)
     assert result.returncode == expected_status, result.stderr
     assert (calls.read_text().splitlines() if calls.exists() else []) == expected_calls
+
+
+@pytest.mark.parametrize("anchor_exists, expected_status", [(True, 0), (False, 1)])
+def test_trust_anchor_is_installed_before_dns_override(tmp_path, anchor_exists, expected_status):
+    anchor = tmp_path / "root.ds"
+    if anchor_exists:
+        anchor.write_text(". IN DS 12345 8 2 TEST_PACKAGE_DATA\n")
+    calls = tmp_path / "calls"
+    for command in ("install", "systemctl", "resolvectl"):
+        executable = tmp_path / command
+        executable.write_text(f'#!/usr/bin/env bash\nprintf "%s\\n" "{command} $*" >> "$CALLS"\n')
+        executable.chmod(0o755)
+    ip = tmp_path / "ip"
+    ip.write_text('#!/usr/bin/env bash\necho "default via 192.168.121.1 dev eth0"\n')
+    ip.chmod(0o755)
+    env = dict(os.environ, PATH=f"{tmp_path}:{os.environ['PATH']}", VM_DNS="1.1.1.1",
+               VM_DNS_TRUST_ANCHOR=str(anchor), CALLS=str(calls))
+    result = subprocess.run(["bash", str(PROVISION.with_name("configure-dns.sh"))],
+                            env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode == expected_status, result.stderr
+    if anchor_exists:
+        operations = calls.read_text().splitlines()
+        assert operations[:3] == [
+            f"install -D -m 0644 -- {anchor} /etc/dnssec-trust-anchors.d/vagrant-root.positive",
+            "systemctl restart systemd-resolved",
+            "resolvectl dns eth0 1.1.1.1",
+        ]
+    else:
+        assert not calls.exists(), "Missing anchor must fail before changing resolver state"

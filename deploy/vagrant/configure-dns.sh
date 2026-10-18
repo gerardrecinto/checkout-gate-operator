@@ -8,6 +8,15 @@ if [[ -z "$interface" ]]; then
   exit 1
 fi
 
+if [[ -n "${VM_DNS_TRUST_ANCHOR:-}" ]]; then
+  if [[ ! -s "$VM_DNS_TRUST_ANCHOR" ]]; then
+    echo "FAIL missing DNS trust anchor: $VM_DNS_TRUST_ANCHOR" >&2
+    exit 1
+  fi
+  install -D -m 0644 -- "$VM_DNS_TRUST_ANCHOR" /etc/dnssec-trust-anchors.d/vagrant-root.positive
+  systemctl restart systemd-resolved
+fi
+
 # A global DNS= drop-in appends to the box's servers and does not override
 # per-link DNS routing. resolvectl validates the address before changing it.
 resolvectl dns "$interface" "$VM_DNS"
