@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -142,5 +143,29 @@ func TestHandleListGates_EmptyListReturnsEmptyArrayNotNull(t *testing.T) {
 
 	if got := rec.Body.String(); got != "[]\n" {
 		t.Fatalf("expected an empty JSON array for no gates (not null), got: %q", got)
+	}
+}
+
+func TestWithCORS(t *testing.T) {
+	called := false
+	h := withCORS(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusTeapot)
+	}))
+
+	get := httptest.NewRecorder()
+	h.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/gates", nil))
+	if !called || get.Code != http.StatusTeapot {
+		t.Fatalf("GET must reach the wrapped handler, code=%d called=%v", get.Code, called)
+	}
+	if get.Header().Get("Access-Control-Allow-Origin") != "*" || get.Header().Get("Access-Control-Allow-Methods") != "GET, OPTIONS" {
+		t.Fatalf("missing CORS headers: %v", get.Header())
+	}
+
+	called = false
+	pre := httptest.NewRecorder()
+	h.ServeHTTP(pre, httptest.NewRequest(http.MethodOptions, "/api/gates", nil))
+	if called || pre.Code != http.StatusNoContent {
+		t.Fatalf("OPTIONS must short-circuit with 204, code=%d called=%v", pre.Code, called)
 	}
 }
