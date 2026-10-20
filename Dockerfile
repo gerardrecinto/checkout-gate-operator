@@ -1,7 +1,7 @@
 # Stage 1: build the frontend. Kept in its own stage so the final image
 # never sees node, npm, or the frontend's dependency tree, only the
 # static files vite already compiled.
-FROM node:20-slim AS frontend-builder
+FROM node:24-slim AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install --no-audit --no-fund
@@ -11,7 +11,7 @@ RUN npm run build
 # Stage 2: build the Go manager binary. CGO disabled and a static build so
 # the runtime stage needs nothing beyond the binary itself, no libc
 # dependency to drag into a distroless image.
-FROM golang:1.26 AS go-builder
+FROM golang:1.27 AS go-builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

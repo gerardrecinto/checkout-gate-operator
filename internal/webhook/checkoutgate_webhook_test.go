@@ -88,13 +88,21 @@ func TestValidateCreate_PassesForAHealthySpec(t *testing.T) {
 	}
 }
 
-func TestValidateCreate_RejectsWrongType(t *testing.T) {
-	s := newScheme(t)
-	c := fake.NewClientBuilder().WithScheme(s).Build()
-	v := &CheckoutGateValidator{Client: c}
+func TestValidateUpdate_AppliesTheSameRules(t *testing.T) {
+	v := &CheckoutGateValidator{Client: fake.NewClientBuilder().WithScheme(newScheme(t)).Build()}
+	bad := &checkoutv1alpha1.CheckoutGate{
+		ObjectMeta: metav1.ObjectMeta{Name: "gate", Namespace: "default"},
+		Spec:       checkoutv1alpha1.CheckoutGateSpec{TargetDeployment: "api", MaxP99LatencyMs: 0},
+	}
+	if _, err := v.ValidateUpdate(context.Background(), nil, bad); err == nil {
+		t.Fatal("expected ValidateUpdate to reject a zero MaxP99LatencyMs")
+	}
+}
 
-	_, err := v.ValidateCreate(context.Background(), &appsv1.Deployment{})
-	if err == nil {
-		t.Fatal("expected an error when handed the wrong runtime.Object type")
+func TestValidateDelete_AlwaysAllows(t *testing.T) {
+	v := &CheckoutGateValidator{}
+	warnings, err := v.ValidateDelete(context.Background(), &checkoutv1alpha1.CheckoutGate{})
+	if err != nil || len(warnings) != 0 {
+		t.Fatalf("warnings=%v err=%v, want none", warnings, err)
 	}
 }
