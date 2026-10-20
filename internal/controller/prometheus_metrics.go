@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	promapi "github.com/prometheus/client_golang/api"
@@ -75,5 +76,11 @@ func (p *PrometheusMetricsProvider) scalarQuery(ctx context.Context, query strin
 	if !ok || len(vector) == 0 {
 		return 0, nil
 	}
-	return float64(vector[0].Value), nil
+	v := float64(vector[0].Value)
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		// 0/0 (no traffic) and an empty histogram both come back as NaN. Treat
+		// them like an empty result: no signal, not a huge negative number.
+		return 0, nil
+	}
+	return v, nil
 }
