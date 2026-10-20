@@ -1,7 +1,7 @@
 # checkout-gate-operator
 
 ![CI](https://github.com/gerardrecinto/checkout-gate-operator/actions/workflows/ci.yml/badge.svg?branch=main)
-![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-controller--runtime-326CE5?logo=kubernetes&logoColor=white)
 ![Svelte](https://img.shields.io/badge/Svelte-TypeScript-FF3E00?logo=svelte&logoColor=white)
 ![Cosign](https://img.shields.io/badge/Signed-Cosign%20keyless-4A4A4A)
@@ -139,6 +139,14 @@ written and assumed correct:
   informer/watch/leader-election machinery behaves identically against
   a real API server, which is the honest gap between "unit tested" and
   "live-cluster tested."
+
+## Quality gates
+
+Every PR must pass `go build`, `go vet`, `go test -race`, gofmt, staticcheck,
+per-package coverage floors (`scripts/go-coverage-gate.sh`), the frontend
+type check and build, the generated CRD check, and secret and vulnerability
+scans before it can merge to `main`. Raise a coverage floor when coverage
+rises; never lower one to get a change through.
 
 ## Layout
 
