@@ -1,13 +1,30 @@
 version: 2
 updates:
+  # Kubernetes libraries have to move together, so one PR bumps them all.
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+      prometheus:
+        patterns:
+          - "github.com/prometheus/*"
+  # Svelte, Vite and TypeScript have to move together too.
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    groups:
+      frontend-toolchain:
+        patterns:
+          - "svelte*"
+          - "@sveltejs/*"
+          - "vite*"
+          - "typescript"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -16,3 +33,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
