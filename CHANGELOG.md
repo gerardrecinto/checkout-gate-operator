@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-20
+
+- Fixed NaN and Inf Prometheus samples (no traffic, empty histogram) being
+  cast to `int32` as -2147483648; they now read as no signal.
+- Added a `go-quality` CI job (gofmt, staticcheck, per-package coverage
+  floors in `scripts/go-coverage-gate.sh`) and required it, with the other CI
+  jobs, on `main`. Added tests for the NATS notifier, Prometheus provider,
+  webhook update and delete, and CORS.
+- Moved to controller-runtime 0.25 and Kubernetes 0.37 libraries, Svelte 5,
+  Vite 8 and Node 24. TypeScript stays on 6 until svelte-check supports 7.
+- Grouped Dependabot updates so related bumps land in one PR.
+
 ## 2026-09-21
 
 - Added an optional NATS notifier (`internal/notify`): a `Notifier`
