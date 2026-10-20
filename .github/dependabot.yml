@@ -25,6 +25,10 @@ updates:
           - "@sveltejs/*"
           - "vite*"
           - "typescript"
+    ignore:
+      # svelte-check's peer range stops at TypeScript 6. Drop this once it allows 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
