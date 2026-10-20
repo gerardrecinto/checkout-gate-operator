@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkout Gate Operator</title>
+  <meta name="description" content="A Kubernetes operator that reads a Deployment's error rate, p99 latency and CPU, and reports Pass, Warn or Breach on a CheckoutGate resource. Open source, written in Go.">
+  <link rel="canonical" href="https://gerardrecinto.github.io/checkout-gate-operator/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#0b0f14">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Checkout Gate Operator">
+  <meta property="og:description" content="A Kubernetes operator that turns error rate, p99 latency and CPU into a Pass, Warn or Breach verdict.">
+  <meta property="og:url" content="https://gerardrecinto.github.io/checkout-gate-operator/">
+  <meta property="og:image" content="https://gerardrecinto.github.io/checkout-gate-operator/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f14; --bg-2: #10161d; --card: #121921; --line: #1f2a35; --fg: #e8eef4; --muted: #93a3b4;
+      --accent: #2dd4bf; --accent-2: #38bdf8; --pass: #10b981; --warn: #f59e0b; --breach: #f43f5e;
+      --glass: rgba(11, 15, 20, 0.72); --shadow: 0 30px 80px -30px rgba(45, 212, 191, 0.25);
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f7f9fb; --bg-2: #eef2f6; --card: #ffffff; --line: #dbe3ea; --fg: #0f1720; --muted: #53657a;
+        --accent: #0d9488; --accent-2: #0284c7; --pass: #059669; --warn: #b45309; --breach: #e11d48;
+        --glass: rgba(247, 249, 251, 0.78); --shadow: 0 30px 80px -30px rgba(13, 148, 136, 0.25);
+      }
+    }
+    :root[data-theme="light"] {
+      --bg: #f7f9fb; --bg-2: #eef2f6; --card: #ffffff; --line: #dbe3ea; --fg: #0f1720; --muted: #53657a;
+      --accent: #0d9488; --accent-2: #0284c7; --pass: #059669; --warn: #b45309; --breach: #e11d48;
+      --glass: rgba(247, 249, 251, 0.78); --shadow: 0 30px 80px -30px rgba(13, 148, 136, 0.25);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 6.5rem; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 400 1rem/1.65 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 3px; border-radius: 6px; }
+    .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    header.top { position: sticky; top: 0; z-index: 20; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 3.5rem; gap: 1rem; }
+    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 700; color: var(--fg); letter-spacing: -.01em; }
+    .brand:hover { text-decoration: none; }
+    .brand svg { width: 1.6rem; height: 1.6rem; }
+    nav.links { display: flex; gap: 1.25rem; align-items: center; font-size: .9rem; }
+    nav.links a { color: var(--muted); }
+    nav.links a:hover { color: var(--fg); text-decoration: none; }
+    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .7rem 1.2rem; border-radius: 999px; font-weight: 600; font-size: .95rem; transition: transform .25s cubic-bezier(.16, 1, .3, 1), box-shadow .25s; }
+    .btn:hover { transform: translateY(-2px); text-decoration: none; }
+    .btn.primary { background: var(--accent); color: #04110f; box-shadow: 0 10px 30px -10px var(--accent); }
+    .btn.ghost { border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+    .btn.small { padding: .45rem .9rem; font-size: .85rem; }
+
+    .hero { position: relative; overflow: hidden; padding: 5.5rem 0 4rem; text-align: center; }
+    .hero::before { content: ""; position: absolute; inset: -20% -10% auto; height: 36rem; background: radial-gradient(40% 50% at 30% 30%, rgba(45, 212, 191, .22), transparent 70%), radial-gradient(40% 50% at 75% 20%, rgba(56, 189, 248, .18), transparent 70%); pointer-events: none; }
+    .eyebrow { font: 500 .75rem/1 'JetBrains Mono', monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 1.25rem; }
+    h1 { position: relative; margin: 0 auto; max-width: 18ch; font-size: clamp(2.4rem, 7vw, 4.75rem); line-height: 1.04; letter-spacing: -.035em; font-weight: 800; }
+    h1 em { font-style: normal; background: linear-gradient(90deg, var(--pass), var(--accent-2), #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lede { position: relative; max-width: 40rem; margin: 1.5rem auto 0; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.25rem); }
+    .cta { position: relative; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; margin-top: 2rem; }
+    .badges { position: relative; display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.75rem; }
+    .badges span { font: 500 .75rem/1 'JetBrains Mono', monospace; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--card); }
+    .hint { position: relative; margin-top: 2.5rem; color: var(--muted); font: 500 .8rem/1 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .hint span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
+    @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+
+    section { padding: 4.5rem 0; }
+    section.alt { background: var(--bg-2); border-block: 1px solid var(--line); }
+    h2 { margin: 0 0 .75rem; font-size: clamp(1.75rem, 4vw, 2.6rem); line-height: 1.1; letter-spacing: -.03em; font-weight: 800; }
+    .sub { color: var(--muted); max-width: 42rem; margin: 0 0 2.25rem; }
+    .grid { display: grid; gap: 1rem; }
+    @media (min-width: 760px) { .grid.c2 { grid-template-columns: 1fr 1fr; } .grid.c3 { grid-template-columns: repeat(3, 1fr); } .grid.c4 { grid-template-columns: repeat(4, 1fr); } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 1.1rem; padding: 1.4rem; }
+    .card h3 { margin: 0 0 .4rem; font-size: 1.05rem; letter-spacing: -.01em; }
+    .card p { margin: 0; color: var(--muted); font-size: .95rem; }
+    .step { font: 600 .75rem/1 'JetBrains Mono', monospace; color: var(--accent); letter-spacing: .1em; margin-bottom: .8rem; }
+
+    .lab { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); }
+    .lab > * { min-width: 0; }
+    @media (min-width: 900px) { .lab { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); } }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 1.25rem; padding: 1.4rem; box-shadow: var(--shadow); }
+    .panel h3 { margin: 0 0 1rem; font: 600 .75rem/1 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .presets { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
+    .presets button { cursor: pointer; font: 500 .8rem/1 'Inter', sans-serif; padding: .55rem .85rem; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); }
+    .presets button:hover { border-color: var(--accent); }
+    .field { margin-bottom: 1.1rem; }
+    .field label { display: flex; justify-content: space-between; gap: 1rem; font-size: .88rem; margin-bottom: .35rem; }
+    .field label b { font: 600 .85rem 'JetBrains Mono', monospace; color: var(--accent); }
+    .field input[type=range] { width: 100%; accent-color: var(--accent); }
+    .field small { color: var(--muted); font-size: .78rem; }
+    .thresholds { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+    .thresholds label { display: block; font-size: .75rem; color: var(--muted); margin-bottom: .3rem; }
+    .thresholds input { width: 100%; padding: .5rem .6rem; border-radius: .6rem; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); font: 500 .9rem 'JetBrains Mono', monospace; }
+    .verdict { font-size: clamp(3rem, 9vw, 5.5rem); font-weight: 800; letter-spacing: -.04em; line-height: 1; margin: .25rem 0 1rem; transition: color .3s; }
+    .verdict[data-v="Pass"] { color: var(--pass); } .verdict[data-v="Warn"] { color: var(--warn); } .verdict[data-v="Breach"] { color: var(--breach); }
+    .reason { color: var(--muted); min-height: 3.2em; margin: 0 0 1.25rem; }
+    pre.code { margin: 0; overflow-x: auto; background: var(--bg-2); border: 1px solid var(--line); border-radius: .9rem; padding: 1rem 1.1rem; font: 400 .82rem/1.6 'JetBrains Mono', monospace; color: var(--fg); }
+    pre.code .k { color: var(--accent-2); } pre.code .c { color: var(--muted); }
+    .shot { display: block; width: 100%; border-radius: 1.1rem; border: 1px solid var(--line); box-shadow: var(--shadow); }
+
+    .honest li { margin-bottom: .6rem; color: var(--muted); }
+    .honest li b { color: var(--fg); }
+    .gaps { border-left: 3px solid var(--warn); }
+    ul.clean { margin: 0; padding-left: 1.1rem; }
+    footer { padding: 2.5rem 0 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; }
+
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .7s cubic-bezier(.16, 1, .3, 1); }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .hint span { animation: none; }
+      .btn { transition: none; }
+    }
+    @media (max-width: 640px) { nav.links .hide-s { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="#top" aria-label="Checkout Gate Operator home">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="8" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent)"/><path d="M9 17l5 5 9-11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--pass)"/></svg>
+        <span>checkout-gate-operator</span>
+      </a>
+      <nav class="links" aria-label="Sections">
+        <a class="hide-s" href="#try">Try it</a>
+        <a class="hide-s" href="#how">How it works</a>
+        <a class="hide-s" href="#verified">Verified</a>
+        <a class="btn ghost small" href="https://github.com/gerardrecinto/checkout-gate-operator" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <div class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Kubernetes operator, written in Go</p>
+        <h1>Know if checkout is <em>safe to ship</em> before customers find out.</h1>
+        <p class="lede">Declare error rate, p99 latency and CPU limits in a <span class="mono">CheckoutGate</span>. The operator reads the live numbers for your Deployment and reports Pass, Warn or Breach, with the reason in plain words.</p>
+        <div class="cta">
+          <a class="btn primary" href="#try">Try the gate</a>
+          <a class="btn ghost" href="https://github.com/gerardrecinto/checkout-gate-operator" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+        </div>
+        <div class="badges" aria-label="Stack">
+          <span>controller-runtime</span><span>admission webhook</span><span>Svelte dashboard</span><span>distroless</span><span>Cosign signed</span>
+        </div>
+        <p class="hint">Scroll down to continue <span aria-hidden="true">&darr;</span></p>
+      </div>
+    </div>
+
+    <section id="try" class="alt">
+      <div class="wrap">
+        <h2 class="reveal">Try the gate in your browser.</h2>
+        <p class="sub reveal">This is the operator's decision logic, ported line for line from <span class="mono">internal/gate/evaluator.go</span> and checked against the same cases. Move the numbers and watch the verdict change.</p>
+        <div class="lab reveal">
+          <div class="panel">
+            <h3>Observed on the target</h3>
+            <div class="presets" role="group" aria-label="Presets">
+              <button type="button" data-preset="healthy">Healthy</button>
+              <button type="button" data-preset="errors">Error spike</button>
+              <button type="button" data-preset="slow">Slow checkout</button>
+              <button type="button" data-preset="cpu">CPU hot</button>
+              <button type="button" data-preset="down">No ready pods</button>
+            </div>
+            <div class="field"><label for="err">Error rate (5xx) <b id="err-v"></b></label><input id="err" type="range" min="0" max="5000" step="10"><small>Shown as a percent. The CRD stores it in thousandths of a percent so 0.5% stays an exact integer.</small></div>
+            <div class="field"><label for="p99">p99 latency <b id="p99-v"></b></label><input id="p99" type="range" min="0" max="2000" step="10"></div>
+            <div class="field"><label for="cpu">CPU saturation <b id="cpu-v"></b></label><input id="cpu" type="range" min="0" max="100" step="1"></div>
+            <div class="field"><label for="ready">Ready replicas <b id="ready-v"></b></label><input id="ready" type="range" min="0" max="3" step="1"><small>3 replicas desired.</small></div>
+            <div class="thresholds">
+              <div><label for="t-err">Max error (milli%)</label><input id="t-err" type="number" min="0" max="100000" value="500"></div>
+              <div><label for="t-p99">Max p99 (ms)</label><input id="t-p99" type="number" min="0" value="450"></div>
+              <div><label for="t-cpu">Max CPU (%)</label><input id="t-cpu" type="number" min="0" max="100" value="80"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Gate verdict</h3>
+            <div id="verdict" class="verdict" data-v="Pass" aria-live="polite">Pass</div>
+            <p id="reason" class="reason">all thresholds satisfied</p>
+<pre class="code"><span class="c"># what you apply to the cluster</span>
+<span class="k">apiVersion:</span> checkout.gerardrecinto.dev/v1alpha1
+<span class="k">kind:</span> CheckoutGate
+<span class="k">metadata:</span>
+  <span class="k">name:</span> retail-checkout-gate
+<span class="k">spec:</span>
+  <span class="k">targetDeployment:</span> retail-checkout-api
+  <span class="k">maxErrorRateMilliPercent:</span> <span id="y-err">500</span> <span class="c"># 0.5%</span>
+  <span class="k">maxP99LatencyMs:</span> <span id="y-p99">450</span>
+  <span class="k">maxCpuSaturationPercent:</span> <span id="y-cpu">80</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="wrap">
+        <h2 class="reveal">How it works.</h2>
+        <p class="sub reveal">Four small pieces, each in its own package so each can be tested without a cluster.</p>
+        <div class="grid c4">
+          <div class="card reveal"><div class="step">01</div><h3>Declare</h3><p>A <span class="mono">CheckoutGate</span> names the Deployment and the limits that matter for checkout.</p></div>
+          <div class="card reveal"><div class="step">02</div><h3>Validate</h3><p>A TLS admission webhook rejects a zero latency limit and warns when the target does not exist yet.</p></div>
+          <div class="card reveal"><div class="step">03</div><h3>Reconcile</h3><p>The controller reads error rate, p99 and CPU from Prometheus and asks the pure gate logic for a verdict.</p></div>
+          <div class="card reveal"><div class="step">04</div><h3>Report</h3><p>The verdict lands in status, on a Svelte dashboard, and optionally on NATS when it changes.</p></div>
+        </div>
+        <div class="grid c2" style="margin-top:1.5rem">
+          <div class="card reveal"><h3>Breach versus Warn</h3><p>Errors and latency are customer-facing, so they breach. CPU alone only warns, so a busy pod does not block a rollout on a resource signal by itself.</p></div>
+          <div class="card reveal"><h3>No traffic is not an outage</h3><p>A service with no requests returns NaN from Prometheus. The operator reads that as no signal instead of a huge negative number.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="wrap">
+        <h2 class="reveal">The dashboard.</h2>
+        <p class="sub reveal">A Svelte app polls a small Go status API that shares the controller's informer cache. This recording uses sample gates pushed by a local script, not a live cluster.</p>
+        <img class="shot reveal" src="assets/checkout-gate-dashboard-demo.gif" width="1100" alt="Recording of the dashboard as gates cycle between Pass, Warn and Breach" loading="lazy">
+      </div>
+    </section>
+
+    <section id="verified">
+      <div class="wrap">
+        <h2 class="reveal">What is checked, and what is not.</h2>
+        <p class="sub reveal">Every merge to <span class="mono">main</span> has to clear these gates.</p>
+        <div class="grid c2">
+          <div class="card reveal">
+            <h3>Gates on every pull request</h3>
+            <ul class="clean honest">
+              <li><b>go test -race</b> across the operator packages</li>
+              <li><b>gofmt and staticcheck</b> with no findings</li>
+              <li><b>Coverage floors</b> per package, never lowered to merge</li>
+              <li><b>Generated CRD</b> must match the Go types</li>
+              <li><b>Frontend</b> type check and build</li>
+              <li><b>Gitleaks, Trivy and CodeQL</b> scans; images signed with Cosign</li>
+            </ul>
+          </div>
+          <div class="card gaps reveal">
+            <h3>Not verified yet</h3>
+            <p>A full run on a live cluster: applying the CRD, watching the controller reconcile a real Deployment, and the webhook rejecting a bad request over live TLS. The fake-client tests cover the logic, not the informer, watch and leader-election behavior against a real API server.</p>
+          </div>
+        </div>
+        <div class="cta reveal" style="justify-content:flex-start;margin-top:2rem">
+          <a class="btn primary" href="https://github.com/gerardrecinto/checkout-gate-operator" target="_blank" rel="noopener noreferrer">Read the code</a>
+          <a class="btn ghost" href="https://github.com/gerardrecinto/checkout-gate-operator/blob/main/docs/GETTING_STARTED.md" target="_blank" rel="noopener noreferrer">Getting started</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>MIT licensed. Built by <a href="https://github.com/gerardrecinto" target="_blank" rel="noopener noreferrer">Gerard Recinto</a>.</span>
+      <span><a href="https://github.com/gerardrecinto/checkout-gate-operator/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer">Architecture</a> &middot; <a href="https://github.com/gerardrecinto/checkout-gate-operator/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { evaluate } from './evaluate.js';
+
+    const $ = (id) => document.getElementById(id);
+    const presets = {
+      healthy: { err: 120, p99: 200, cpu: 40, ready: 3 },
+      errors: { err: 2400, p99: 220, cpu: 45, ready: 3 },
+      slow: { err: 100, p99: 1100, cpu: 55, ready: 3 },
+      cpu: { err: 100, p99: 210, cpu: 93, ready: 3 },
+      down: { err: 0, p99: 0, cpu: 0, ready: 0 },
+    };
+
+    function render() {
+      const m = {
+        errorRateMilliPercent: +$('err').value, p99LatencyMs: +$('p99').value,
+        cpuSaturationPercent: +$('cpu').value, readyReplicas: +$('ready').value, desiredReplicas: 3,
+      };
+      const spec = {
+        maxErrorRateMilliPercent: +$('t-err').value || 0, maxP99LatencyMs: +$('t-p99').value || 0,
+        maxCpuSaturationPercent: +$('t-cpu').value || 0,
+      };
+      $('err-v').textContent = (m.errorRateMilliPercent / 1000).toFixed(2) + '%';
+      $('p99-v').textContent = m.p99LatencyMs + ' ms';
+      $('cpu-v').textContent = m.cpuSaturationPercent + '%';
+      $('ready-v').textContent = m.readyReplicas + ' of 3';
+      $('y-err').textContent = spec.maxErrorRateMilliPercent;
+      $('y-p99').textContent = spec.maxP99LatencyMs;
+      $('y-cpu').textContent = spec.maxCpuSaturationPercent;
+      const r = evaluate(spec, m);
+      const v = $('verdict');
+      v.textContent = r.verdict;
+      v.dataset.v = r.verdict;
+      $('reason').textContent = r.message;
+    }
+
+    document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+      const p = presets[b.dataset.preset];
+      $('err').value = p.err; $('p99').value = p.p99; $('cpu').value = p.cpu; $('ready').value = p.ready;
+      render();
+    }));
+    ['err', 'p99', 'cpu', 'ready', 't-err', 't-p99', 't-cpu'].forEach((id) => $(id).addEventListener('input', render));
+    document.querySelector('[data-preset="healthy"]').click();
+
+    const items = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+      items.forEach((el) => io.observe(el));
+    } else {
+      items.forEach((el) => el.classList.add('in'));
+    }
+  </script>
+</body>
+</html>

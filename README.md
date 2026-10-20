@@ -7,6 +7,8 @@
 ![Cosign](https://img.shields.io/badge/Signed-Cosign%20keyless-4A4A4A)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
+**Live site and interactive demo: https://gerardrecinto.github.io/checkout-gate-operator/**
+
 A real Kubernetes operator for retail checkout services: a `CheckoutGate`
 custom resource, a controller that reconciles it against a target
 Deployment's live error rate, p99 latency, and CPU saturation, a
