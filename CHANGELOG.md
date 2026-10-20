@@ -11,6 +11,7 @@
 - Moved to controller-runtime 0.25 and Kubernetes 0.37 libraries, Svelte 5,
   Vite 8 and Node 24. TypeScript stays on 6 until svelte-check supports 7.
 - Grouped Dependabot updates so related bumps land in one PR.
+- Added a project site under `site/`, deployed to GitHub Pages, with a browser port of the gate logic whose tests run in CI.
 
 ## 2026-09-21
 

@@ -1,0 +1,64 @@
+name: Project site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "internal/gate/evaluator.go"
+      - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "internal/gate/evaluator.go"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Site check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Gate logic matches the Go evaluator cases
+        run: node --test site/evaluate.test.mjs
+      - name: Every local file the page references exists
+        run: |
+          set -euo pipefail
+          cd site
+          missing=0
+          for ref in $(grep -oE '(src|href)="[^"#:]+"' index.html | sed -E 's/^(src|href)="//; s/"$//' | sort -u); do
+            if [ ! -e "$ref" ]; then echo "missing: $ref"; missing=1; fi
+          done
+          exit $missing
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
