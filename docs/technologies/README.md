@@ -18,3 +18,4 @@ docs.
 | [prometheus-promql.md](prometheus-promql.md) | Pull-based scraping, reading this repo's actual PromQL line by line, `histogram_quantile` |
 | [svelte.md](svelte.md) | Compiler vs. runtime framework, why `let gates = []` is reactive with no extra API |
 | [kustomize.md](kustomize.md) | Composing plain YAML without templating it, contrasted with Helm's render step |
+| [nats-notifications.md](nats-notifications.md) | The optional `Notifier` seam, detecting a real verdict transition instead of reacting to every reconcile, subject naming |

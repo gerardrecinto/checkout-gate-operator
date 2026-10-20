@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-21
+
+- Added an optional NATS notifier (`internal/notify`): a `Notifier`
+  interface with a no-op default, and a real `NATSNotifier` behind
+  `github.com/nats-io/nats.go`, wired in via a new `-nats-url` flag
+  (empty by default, disabled). The reconciler now captures a
+  `CheckoutGate`'s previous `Status.Verdict` and calls the notifier only
+  when the verdict actually changes (Pass->Warn, Warn->Breach, etc),
+  never on every reconcile, publishing a JSON payload to
+  `checkoutgate.<namespace>.<name>.verdict`. Same interface-at-the-
+  boundary pattern already used for `MetricsProvider`. Added table-driven
+  tests for `internal/notify` and extended the controller test suite to
+  cover exactly-once notification on a transition and zero notifications
+  across two unchanged reconciles, none of it needs a live NATS server.
+  Pulled in `golang.org/x/crypto` as a new indirect dependency via
+  `nats-io/nkeys`, pinned to v0.55.0 (not latest) to keep the module's Go
+  version at 1.25.0 while still landing ahead of the CVE Trivy flagged in
+  the version `go get`'s default resolution picked.
+
 ## 2026-09-11
 
 - Initial build: `CheckoutGate` CRD, `controller-runtime` reconciler
