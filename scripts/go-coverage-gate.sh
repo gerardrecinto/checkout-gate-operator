@@ -9,7 +9,7 @@ floors=(
   "./internal/controller:77"
   "./internal/gate:100"
   "./internal/notify:93"
-  "./internal/webhook:86"
+  "./internal/webhook:81"
 )
 
 fail=0

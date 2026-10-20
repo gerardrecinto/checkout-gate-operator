@@ -64,7 +64,7 @@ func (p *PrometheusMetricsProvider) FetchMetrics(ctx context.Context, namespace,
 }
 
 func (p *PrometheusMetricsProvider) scalarQuery(ctx context.Context, query string) (float64, error) {
-	result, warnings, err := p.api.Query(ctx, query, time.Now())
+	result, warnings, _, err := p.api.Query(ctx, query, time.Now())
 	if err != nil {
 		return 0, err
 	}
