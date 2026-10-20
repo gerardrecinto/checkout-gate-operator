@@ -67,7 +67,7 @@ func (r *CheckoutGateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			cg.Status.LastEvaluated = metav1.Now()
 			cg.Status.ObservedGeneration = cg.Generation
 			if updErr := r.Status().Update(ctx, &cg); updErr != nil {
-				return ctrl.Result{}, updErr
+				return ctrl.Result{}, fmt.Errorf("updating CheckoutGate status: %w", updErr)
 			}
 			r.notifyVerdictChange(ctx, &cg, previousVerdict)
 			return ctrl.Result{}, nil
