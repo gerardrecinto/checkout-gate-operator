@@ -1,0 +1,29 @@
+# One Ubuntu VM that is provisioned by provision.sh. The libvirt provider uses
+# KVM, so it needs a Linux host with /dev/kvm. The CI job runs it on a runner.
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/ubuntu2204"
+  config.vm.hostname = "edge-lab"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider :libvirt do |lv|
+    lv.driver = "kvm"
+    lv.cpus = 2
+    lv.memory = 2048
+  end
+
+  # Override the guest link's DNS servers and route DNS through that link.
+  # A global resolved drop-in alone leaves the box's per-link servers active.
+  if ENV["VM_DNS"]
+    anchor = ENV["VM_DNS_TRUST_ANCHOR"]
+    if anchor
+      unless File.file?(anchor) && File.readable?(anchor) && File.size?(anchor)
+        raise ArgumentError, "VM_DNS_TRUST_ANCHOR must name a readable, nonempty DS trust anchor file"
+      end
+      config.vm.provision "file", source: anchor, destination: "/tmp/vagrant-root.ds"
+    end
+    config.vm.provision "shell", path: "configure-dns.sh",
+      env: { "VM_DNS" => ENV["VM_DNS"], "VM_DNS_TRUST_ANCHOR" => anchor ? "/tmp/vagrant-root.ds" : "" }
+  end
+
+  config.vm.provision "shell", path: "provision.sh"
+end

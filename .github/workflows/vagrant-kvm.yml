@@ -1,0 +1,76 @@
+name: vagrant-kvm
+
+on:
+  pull_request:
+    paths: ['deploy/vagrant/**', '.github/workflows/vagrant-kvm.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm KVM is available
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Install Vagrant and libvirt
+        run: |
+          wget -qO- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq vagrant qemu-kvm libvirt-daemon-system libvirt-dev ruby-dev build-essential libxslt-dev libxml2-dev zlib1g-dev dns-root-data
+          dpkg-query -W dns-root-data
+          test -s /usr/share/dns/root.ds
+          sudo usermod -aG libvirt "$USER"
+          sudo vagrant plugin install vagrant-libvirt
+          vagrant --version
+
+      - name: Bring the VM up and provision it
+        timeout-minutes: 15
+        working-directory: deploy/vagrant
+        env:
+          VM_DNS: 1.1.1.1
+          VM_DNS_TRUST_ANCHOR: /usr/share/dns/root.ds
+        run: |
+          set -o pipefail
+          sudo --preserve-env=VM_DNS,VM_DNS_TRUST_ANCHOR vagrant up --provider=libvirt 2>&1 | tee up.log
+
+      - name: Show the provision result
+        working-directory: deploy/vagrant
+        run: |
+          grep 'provision checks passed' up.log
+
+      - name: Diagnose guest networking on failure
+        if: failure()
+        timeout-minutes: 2
+        working-directory: deploy/vagrant
+        run: |
+          sudo virsh net-list --all
+          sudo vagrant ssh -c '
+            ip -brief address
+            ip route
+            date -u
+            systemd --version
+            dpkg-query -W systemd dns-root-data
+            cat /etc/resolv.conf
+            resolvectl status
+            echo "Testing TCP connectivity to CI DNS at 1.1.1.1:53"
+            timeout 5 bash -c "true > /dev/tcp/1.1.1.1/53"
+            resolvectl query mirrors.edge.kernel.org
+            sudo journalctl -u systemd-resolved --no-pager -n 40
+          '
+
+      - name: Destroy the VM
+        if: always()
+        timeout-minutes: 3
+        working-directory: deploy/vagrant
+        run: |
+          sudo vagrant destroy -f
