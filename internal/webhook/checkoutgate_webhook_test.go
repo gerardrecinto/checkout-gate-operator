@@ -88,17 +88,6 @@ func TestValidateCreate_PassesForAHealthySpec(t *testing.T) {
 	}
 }
 
-func TestValidateCreate_RejectsWrongType(t *testing.T) {
-	s := newScheme(t)
-	c := fake.NewClientBuilder().WithScheme(s).Build()
-	v := &CheckoutGateValidator{Client: c}
-
-	_, err := v.ValidateCreate(context.Background(), &appsv1.Deployment{})
-	if err == nil {
-		t.Fatal("expected an error when handed the wrong runtime.Object type")
-	}
-}
-
 func TestValidateUpdate_AppliesTheSameRules(t *testing.T) {
 	v := &CheckoutGateValidator{Client: fake.NewClientBuilder().WithScheme(newScheme(t)).Build()}
 	bad := &checkoutv1alpha1.CheckoutGate{
@@ -107,9 +96,6 @@ func TestValidateUpdate_AppliesTheSameRules(t *testing.T) {
 	}
 	if _, err := v.ValidateUpdate(context.Background(), nil, bad); err == nil {
 		t.Fatal("expected ValidateUpdate to reject a zero MaxP99LatencyMs")
-	}
-	if _, err := v.ValidateUpdate(context.Background(), nil, &appsv1.Deployment{}); err == nil {
-		t.Fatal("expected ValidateUpdate to reject a non-CheckoutGate object")
 	}
 }
 

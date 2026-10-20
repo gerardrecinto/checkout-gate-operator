@@ -12,7 +12,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,25 +27,17 @@ type CheckoutGateValidator struct {
 	Client client.Reader
 }
 
-var _ admission.CustomValidator = &CheckoutGateValidator{}
+var _ admission.Validator[*checkoutv1alpha1.CheckoutGate] = &CheckoutGateValidator{}
 
-func (v *CheckoutGateValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cg, ok := obj.(*checkoutv1alpha1.CheckoutGate)
-	if !ok {
-		return nil, fmt.Errorf("expected a CheckoutGate, got %T", obj)
-	}
+func (v *CheckoutGateValidator) ValidateCreate(ctx context.Context, cg *checkoutv1alpha1.CheckoutGate) (admission.Warnings, error) {
 	return v.validate(ctx, cg)
 }
 
-func (v *CheckoutGateValidator) ValidateUpdate(ctx context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	cg, ok := newObj.(*checkoutv1alpha1.CheckoutGate)
-	if !ok {
-		return nil, fmt.Errorf("expected a CheckoutGate, got %T", newObj)
-	}
+func (v *CheckoutGateValidator) ValidateUpdate(ctx context.Context, _, cg *checkoutv1alpha1.CheckoutGate) (admission.Warnings, error) {
 	return v.validate(ctx, cg)
 }
 
-func (v *CheckoutGateValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+func (v *CheckoutGateValidator) ValidateDelete(_ context.Context, _ *checkoutv1alpha1.CheckoutGate) (admission.Warnings, error) {
 	return nil, nil
 }
 
@@ -80,8 +71,7 @@ func (v *CheckoutGateValidator) validate(ctx context.Context, cg *checkoutv1alph
 // SetupWebhookWithManager registers this validator with the manager's webhook server.
 func (v *CheckoutGateValidator) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	v.Client = mgr.GetClient()
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&checkoutv1alpha1.CheckoutGate{}).
+	return ctrl.NewWebhookManagedBy(mgr, &checkoutv1alpha1.CheckoutGate{}).
 		WithValidator(v).
 		Complete()
 }
