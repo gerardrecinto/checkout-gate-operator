@@ -326,7 +326,7 @@ func TestReconcile_MissingCheckoutGateIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Reconcile() on a deleted CheckoutGate should not error, got: %v", err)
 	}
-	if res.Requeue {
+	if !res.IsZero() {
 		t.Fatalf("Reconcile() on a deleted CheckoutGate should not request a requeue")
 	}
 }
